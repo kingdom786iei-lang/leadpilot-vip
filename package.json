@@ -1,6 +1,6 @@
 {
-  "name": "leadpilot-vip",
-  "version": "1.0.0",
+  "name": "leadpilot-vip-v2",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "start": "node server.js"
@@ -9,8 +9,6 @@
     "better-sqlite3": "^11.10.0",
     "dotenv": "^16.4.1",
     "express": "^5.1.0",
-    "imapflow": "^1.0.181",
-    "nodemailer": "^6.9.5",
     "puppeteer": "^24.16.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
