@@ -1,77 +1,5 @@
-const express = require("express"), path = require("path"), fs = require("fs");
-const nodemailer = require("nodemailer");
-const puppeteer = require("puppeteer-extra");
-const StealthPlugin = require("puppeteer-extra-plugin-stealth");
-const { WebSocketServer } = require("ws"), ImapFlow = require("imapflow");
-const Database = require("better-sqlite3");
-
-// پپیٹیر کو بوٹ ڈیٹیکشن بائی پاس کرنے کے لیے اسٹیلتھ موڈ پر سیٹ کرنا
-puppeteer.use(StealthPlugin());
-
-const app = express(), server = require("http").createServer(app);
-const wss = new WebSocketServer({ server });
-
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
-const dbPath = process.env.DATABASE_PATH || "./data/leadpilot.sqlite";
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-const db = new Database(dbPath);
-
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS leads (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    website TEXT,
-    email TEXT,
-    status TEXT DEFAULT 'NEW',
-    pitched TEXT DEFAULT 'NO',
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(name, website)
-  )
-`).run();
-
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    lead_id INTEGER,
-    direction TEXT,
-    subject TEXT,
-    body TEXT,
-    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(lead_id) REFERENCES leads(id)
-  )
-`).run();
-
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  )
-`).run();
-
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    level TEXT,
-    message TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-  )
-`).run();
-
-function broadcast(data) {
-  wss.clients.forEach(client => {
-    if (client.readyState === 1) client.send(JSON.stringify(data));
-  });
-}
-
-function log(level, message) {
-  db.prepare("INSERT INTO logs (level, message) VALUES (?, ?)").run(level, message);
-  broadcast({ type: "log", level, message });
-}
-
 async function scrapeMaps(query, location) {
-  log("info", `Searching with Stealth Mode for "${query}" in "${location}"...`);
+  log("info", `Searching for "${query}" in "${location}"...`);
   
   const browser = await puppeteer.launch({
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
@@ -81,7 +9,7 @@ async function scrapeMaps(query, location) {
       "--disable-setuid-sandbox",
       "--disable-blink-features=AutomationControlled",
       "--disable-web-security",
-      "--disable-features=IsolateOrigins,site-per-process"
+      "--lang=en-US,en" // گوگل کو مجبور کرنا کہ وہ انگلش ورژن ہی لوڈ کرے
     ]
   });
 
@@ -91,40 +19,42 @@ async function scrapeMaps(query, location) {
 
   let items = [];
   try {
-    const searchUrl = `https://google.com{encodeURIComponent(query + " " + location)}`;
+    // گوگل سرچ کے ذریعے سیدھا رزلٹس پیج پر جانا
+    const searchUrl = `https://google.com{encodeURIComponent(query + " " + location)}&tbm=lcl`;
     await page.goto(searchUrl, { waitUntil: "networkidle2", timeout: 60000 });
 
-    await page.waitForSelector('a[href*="/maps/place/"]', { timeout: 20000 }).catch(() => {});
-    
-    // سکرین اسکرولنگ کرنا تاکہ تمام رزلٹس لسٹ میں لوڈ ہو جائیں
-    for (let i = 0; i < 6; i++) {
-      await page.evaluate(() => {
-        const sidePanel = document.querySelector('div[role="feed"]');
-        if (sidePanel) sidePanel.scrollBy(0, 1000);
-        else window.scrollBy(0, 1000);
-      });
-      await new Promise(r => setTimeout(r, 1500));
-    }
-
+    // لنکس نکالنے کا بالکل نیا اور بائی پاس طریقہ (گوگل سرچ لوکل لسٹنگ کے لیے)
     const links = await page.evaluate(() => {
-      const elements = document.querySelectorAll('a[href*="/maps/place/"]');
-      return Array.from(elements).map(el => ({
-        name: el.getAttribute('aria-label') || el.innerText,
-        url: el.href
-      })).filter(item => item.name);
+      const elements = document.querySelectorAll('a[href*="maps/place"]');
+      return Array.from(elements).map(el => {
+        // نام تلاش کرنا
+        let nameEl = el.querySelector('span') || el;
+        return {
+          name: nameEl.innerText ? nameEl.innerText.trim() : '',
+          url: el.href
+        };
+      }).filter(item => item.name.length > 2 && item.url.includes('google.com'));
     });
 
-    log("info", `Found ${links.length} businesses on map screen. Extracting details...`);
+    log("info", `Found ${links.length} businesses on Google Search Maps.`);
 
-    // صرف ٹاپ 8 رزلٹس کا ڈیٹا نکالنا تاکہ سرور کریش یا بلاک نہ ہو
-    for (const item of links.slice(0, 8)) {
+    // ہر بزنس کی پروفائل اوپن کر کے ڈیٹا نکالنا
+    for (const item of links.slice(0, 5)) { 
       try {
         const newPage = await browser.newPage();
         await newPage.goto(item.url, { waitUntil: "networkidle2", timeout: 30000 });
 
+        // ویب سائٹ کا ڈیٹا نکالنے کا یونیورسل طریقہ
         const website = await newPage.evaluate(() => {
-          const webEl = document.querySelector('a[data-item-id="authority"]');
-          return webEl ? webEl.href : null;
+          // تمام لنکس چیک کریں جو آؤٹ گوئنگ ہوں
+          const allLinks = Array.from(document.querySelectorAll('a'));
+          for (let link of allLinks) {
+            const href = link.href;
+            if (href && !href.includes('google.com') && !href.includes('javascript') && href.startsWith('http')) {
+              return href;
+            }
+          }
+          return null;
         });
 
         await newPage.close();
@@ -139,16 +69,16 @@ async function scrapeMaps(query, location) {
             if (emailMatch) email = emailMatch[0];
             await webPage.close();
           } catch (e) {
-            // ای میل اسکین فیل ہونے پر خاموشی اختیار کریں
+            // ویب سائٹ اسکین ایرر
           }
         }
 
         if (website || email) {
           items.push({ name: item.name, website: website || "", email: email || "" });
-          log("info", `Extracted: ${item.name}`);
+          log("info", `Successfully extracted: ${item.name}`);
         }
       } catch (err) {
-        log("warning", `Skipped business due to error.`);
+        log("warning", `Error loading item details.`);
       }
     }
   } catch (error) {
@@ -157,47 +87,4 @@ async function scrapeMaps(query, location) {
     await browser.close();
   }
   return items;
-}
-
-app.post("/api/settings", (req, res) => {
-  const { autoPitch } = req.body;
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('autoPitch', ?)")
-    .run(autoPitch ? "true" : "false");
-  res.json({ status: "ok" });
-});
-
-app.post("/api/scrape", async (req, res) => {
-  const { query, location } = req.body;
-  if (!query || !location) return res.status(400).json({ error: "Query and location required" });
-
-  try {
-    const items = await scrapeMaps(query, location);
-    let saved = 0;
-
-    const insert = db.prepare(`
-      INSERT INTO leads (name, website, email) VALUES (?, ?, ?)
-      ON CONFLICT(name) DO UPDATE SET website=excluded.website, email=excluded.email
-    `);
-
-    for (const item of items) {
-      const res = insert.run(item.name, item.website, item.email);
-      if (res.changes > 0) saved++;
-    }
-
-    broadcast({ type: "state", state: { leads: db.prepare("SELECT * FROM leads ORDER BY id DESC LIMIT 100").all() } });
-    res.json({ length: items.length, saved });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/api/state", (req, res) => {
-  res.json({
-    leads: db.prepare("SELECT * FROM leads ORDER BY id DESC LIMIT 100").all(),
-    logs: db.prepare("SELECT * FROM logs ORDER BY id DESC LIMIT 100").all()
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-      
+              }
