@@ -1,0 +1,1049 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LeadPilot VIP</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:#050712;
+      color:#e8eef9;
+      font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      overflow-x:hidden;
+    }
+
+    body:before{
+      content:"";
+      position:fixed;
+      inset:-25%;
+      z-index:-3;
+      background:
+        radial-gradient(circle at 15% 20%,rgba(14,165,233,.18),transparent 25%),
+        radial-gradient(circle at 85% 25%,rgba(168,85,247,.15),transparent 27%),
+        radial-gradient(circle at 55% 90%,rgba(16,185,129,.12),transparent 28%);
+      animation:aurora 15s ease-in-out infinite alternate;
+      pointer-events:none;
+    }
+
+    body:after{
+      content:"";
+      position:fixed;
+      inset:0;
+      z-index:-2;
+      background-image:
+        linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+      background-size:42px 42px;
+      mask-image:linear-gradient(to bottom,transparent,black 18%,black 82%,transparent);
+      pointer-events:none;
+    }
+
+    @keyframes aurora{
+      from{transform:translate3d(-2%,0,0) scale(1)}
+      to{transform:translate3d(2%,-2%,0) scale(1.08)}
+    }
+
+    .glass{
+      background:rgba(10,15,31,.72);
+      border:1px solid rgba(255,255,255,.09);
+      backdrop-filter:blur(18px);
+      -webkit-backdrop-filter:blur(18px);
+      box-shadow:0 25px 80px rgba(0,0,0,.28);
+    }
+
+    .card{
+      transition:.25s ease;
+    }
+
+    .card:hover{
+      transform:translateY(-3px);
+      border-color:rgba(56,189,248,.2);
+    }
+
+    .btn{
+      transition:.2s ease;
+    }
+
+    .btn:hover{
+      transform:translateY(-2px);
+      filter:brightness(1.1);
+    }
+
+    .pulse{
+      animation:pulse 1.8s infinite;
+    }
+
+    @keyframes pulse{
+      0%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}
+      70%{box-shadow:0 0 0 10px rgba(239,68,68,0)}
+      100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}
+    }
+
+    .online{
+      animation:online 2s infinite;
+    }
+
+    @keyframes online{
+      50%{opacity:.45}
+    }
+
+    .shine{
+      position:relative;
+      overflow:hidden;
+    }
+
+    .shine:after{
+      content:"";
+      position:absolute;
+      top:-80%;
+      left:-100%;
+      width:40%;
+      height:250%;
+      background:linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,.28),
+        transparent
+      );
+      transform:rotate(20deg);
+      animation:shine 4s infinite;
+    }
+
+    @keyframes shine{
+      0%,55%{left:-100%}
+      75%{left:160%}
+      100%{left:160%}
+    }
+
+    .scan{
+      position:relative;
+      overflow:hidden;
+    }
+
+    .scan:before{
+      content:"";
+      position:absolute;
+      left:0;
+      right:0;
+      top:-30%;
+      height:30%;
+      background:linear-gradient(
+        transparent,
+        rgba(56,189,248,.12),
+        transparent
+      );
+      animation:scan 2.5s linear infinite;
+      pointer-events:none;
+    }
+
+    @keyframes scan{
+      to{top:110%}
+    }
+
+    .typing span{
+      display:inline-block;
+      width:5px;
+      height:5px;
+      margin:0 2px;
+      border-radius:50%;
+      background:#38bdf8;
+      animation:typing 1.2s infinite;
+    }
+
+    .typing span:nth-child(2){animation-delay:.15s}
+    .typing span:nth-child(3){animation-delay:.3s}
+
+    @keyframes typing{
+      0%,60%,100%{transform:translateY(0);opacity:.35}
+      30%{transform:translateY(-4px);opacity:1}
+    }
+
+    .status-new{color:#94a3b8}
+    .status-pitched{color:#38bdf8}
+    .status-replied{color:#34d399}
+    .status-handoff{color:#f87171}
+
+    ::-webkit-scrollbar{width:7px;height:7px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{
+      background:rgba(148,163,184,.2);
+      border-radius:99px;
+    }
+
+    input,textarea{
+      color:#e8eef9;
+    }
+
+    .toast{
+      animation:toastIn .3s ease;
+    }
+
+    @keyframes toastIn{
+      from{opacity:0;transform:translateY(15px)}
+      to{opacity:1;transform:translateY(0)}
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="toastBox"
+     class="fixed right-4 bottom-4 z-50 space-y-2 w-[calc(100%-2rem)] max-w-sm">
+</div>
+
+<main class="max-w-7xl mx-auto px-4 py-5 md:px-7 md:py-7">
+
+  <!-- HEADER -->
+  <header class="flex flex-wrap items-center justify-between gap-5 mb-7">
+
+    <div>
+      <div class="text-sky-300 text-[11px] font-black tracking-[.3em]">
+        PRIVATE AI SALES COMMAND CENTER
+      </div>
+
+      <h1 class="text-4xl md:text-5xl font-black mt-1 tracking-tight">
+        LeadPilot
+        <span class="text-sky-400">VIP</span>
+      </h1>
+
+      <p class="text-slate-400 text-sm mt-1">
+        Find leads → pitch → monitor replies → take over hot buyers.
+      </p>
+    </div>
+
+    <div class="glass rounded-2xl px-4 py-3 flex items-center gap-3">
+      <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 online"></span>
+      <div>
+        <div class="text-sm font-bold">System Online</div>
+        <div class="text-[10px] text-slate-500">
+          Live connection
+        </div>
+      </div>
+    </div>
+
+  </header>
+
+
+  <!-- STATS -->
+  <section id="stats"
+           class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+  </section>
+
+
+  <!-- TOP GRID -->
+  <section class="grid lg:grid-cols-3 gap-5">
+
+    <!-- SCRAPER -->
+    <div class="glass card scan rounded-3xl p-5">
+
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs text-sky-300 font-bold">
+            LEAD DISCOVERY
+          </div>
+
+          <h2 class="text-xl font-black mt-1">
+            🗺️ Find New Leads
+          </h2>
+        </div>
+
+        <div class="text-xl">⚡</div>
+      </div>
+
+      <p class="text-xs text-slate-500 mt-2">
+        Search businesses and collect available public contact details.
+      </p>
+
+      <label class="block text-xs text-slate-500 mt-5 mb-1">
+        Keyword
+      </label>
+
+      <input
+        id="q"
+        class="w-full bg-white/5 border border-white/10 rounded-xl p-3 outline-none focus:border-sky-400/50"
+        placeholder="restaurants"
+      >
+
+      <label class="block text-xs text-slate-500 mt-3 mb-1">
+        Location
+      </label>
+
+      <input
+        id="loc"
+        class="w-full bg-white/5 border border-white/10 rounded-xl p-3 outline-none focus:border-sky-400/50"
+        placeholder="Karachi"
+      >
+
+      <button
+        id="scrapeBtn"
+        onclick="scrape()"
+        class="btn shine w-full mt-4 bg-sky-500 text-slate-950 font-black rounded-xl p-3">
+        START SCRAPING
+      </button>
+
+      <div id="scrapeMsg"
+           class="text-xs text-slate-400 mt-3 min-h-[18px]">
+      </div>
+
+
+      <!-- AUTO PITCH -->
+      <div class="mt-5 pt-5 border-t border-white/10">
+
+        <div class="flex items-center justify-between">
+
+          <div>
+            <div class="font-bold">
+              🤖 Auto-Pitch
+            </div>
+
+            <div class="text-[11px] text-slate-500">
+              Claude AI + Gmail
+            </div>
+          </div>
+
+          <button
+            id="auto"
+            onclick="toggleAuto()"
+            class="w-14 h-8 rounded-full bg-slate-700 relative transition">
+
+            <span
+              id="autoDot"
+              class="absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition">
+            </span>
+
+          </button>
+
+        </div>
+
+        <div id="aiStatus"
+             class="hidden mt-4 rounded-xl bg-sky-500/10 border border-sky-400/10 p-3">
+
+          <div class="flex items-center gap-2 text-xs text-sky-300 font-bold">
+            <span class="typing">
+              <span></span><span></span><span></span>
+            </span>
+
+            AI SALES ENGINE ACTIVE
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <!-- LEADS -->
+    <div class="lg:col-span-2 glass card rounded-3xl p-5">
+
+      <div class="flex items-center justify-between mb-4">
+
+        <div>
+          <div class="text-xs text-sky-300 font-bold">
+            PIPELINE
+          </div>
+
+          <h2 class="text-xl font-black">
+            📋 Lead Pipeline
+          </h2>
+        </div>
+
+        <div class="text-[11px] text-slate-500">
+          LIVE
+        </div>
+
+      </div>
+
+      <div class="overflow-auto max-h-[430px]">
+
+        <table class="w-full text-sm">
+
+          <thead>
+            <tr class="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-white/10">
+              <th class="p-2">Business</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+
+          <tbody id="leads"></tbody>
+
+        </table>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+  <!-- BOTTOM -->
+  <section class="grid lg:grid-cols-2 gap-5 mt-5">
+
+    <!-- CHAT -->
+    <div class="glass card rounded-3xl p-5">
+
+      <div class="flex items-center justify-between mb-4">
+
+        <div>
+          <div class="text-xs text-emerald-300 font-bold">
+            GMAIL MONITOR
+          </div>
+
+          <h2 class="text-xl font-black">
+            💬 Live Conversations
+          </h2>
+        </div>
+
+        <span class="text-xs text-slate-500">
+          LIVE
+        </span>
+
+      </div>
+
+      <div id="chats"
+           class="space-y-3 max-h-[390px] overflow-auto">
+      </div>
+
+    </div>
+
+
+    <!-- HANDOFF -->
+    <div class="glass card rounded-3xl p-5">
+
+      <div>
+        <div class="text-xs text-red-300 font-bold">
+          HIGH BUYING INTENT
+        </div>
+
+        <h2 class="text-xl font-black">
+          🚨 Handoff Center
+        </h2>
+      </div>
+
+      <div id="handoffs"
+           class="space-y-3 mt-4">
+      </div>
+
+      <div class="mt-6 pt-5 border-t border-white/10">
+
+        <div class="text-xs text-slate-500 mb-2">
+          SYSTEM ACTIVITY
+        </div>
+
+        <div id="logs"
+             class="space-y-1 text-xs text-slate-500 max-h-40 overflow-auto">
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</main>
+
+
+<script>
+
+let STATE={
+  autoPitch:false,
+  leads:[],
+  messages:[],
+  logs:[]
+};
+
+const $=id=>document.getElementById(id);
+
+
+function esc(value=""){
+  return String(value).replace(/[&<>"']/g,char=>({
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#039;"
+  }[char]));
+}
+
+
+function toast(message,type="info"){
+
+  const box=$("toastBox");
+
+  const el=document.createElement("div");
+
+  el.className=
+    "toast glass rounded-xl px-4 py-3 text-sm border "+
+    (type==="error"
+      ?"border-red-400/30 text-red-300"
+      :"border-sky-400/20 text-sky-200");
+
+  el.textContent=message;
+
+  box.appendChild(el);
+
+  setTimeout(()=>{
+    el.remove();
+  },4000);
+}
+
+
+function render(state){
+
+  STATE=state||STATE;
+
+  const leads=STATE.leads||[];
+  const messages=STATE.messages||[];
+
+  const pitched=
+    leads.filter(x=>x.status==="Pitched").length;
+
+  const replies=
+    leads.filter(x=>
+      x.status==="Replied" ||
+      x.status==="HANDOFF REQUIRED"
+    ).length;
+
+  const handoffs=
+    leads.filter(x=>
+      x.status==="HANDOFF REQUIRED"
+    ).length;
+
+
+  $("stats").innerHTML=[
+
+    ["TOTAL LEADS",leads.length,"👥"],
+
+    ["PITCHED",pitched,"📤"],
+
+    ["REPLIES",replies,"💬"],
+
+    ["HANDOFFS",handoffs,"🚨"]
+
+  ].map(item=>`
+
+    <div class="glass card rounded-2xl p-4">
+
+      <div class="flex justify-between">
+
+        <div>
+          <div class="text-[10px] text-slate-500 font-bold tracking-wider">
+            ${item[0]}
+          </div>
+
+          <div class="text-2xl font-black mt-1">
+            ${item[1]}
+          </div>
+        </div>
+
+        <div class="text-xl opacity-70">
+          ${item[2]}
+        </div>
+
+      </div>
+
+    </div>
+
+  `).join("");
+
+
+  $("leads").innerHTML=leads.length
+    ? leads.map(lead=>{
+
+        let statusClass="status-new";
+
+        if(lead.status==="Pitched")
+          statusClass="status-pitched";
+
+        if(lead.status==="Replied")
+          statusClass="status-replied";
+
+        if(lead.status==="HANDOFF REQUIRED")
+          statusClass="status-handoff";
+
+
+        return `
+
+        <tr class="border-b border-white/5 hover:bg-white/[.025]">
+
+          <td class="p-3">
+
+            <div class="font-bold">
+              ${esc(lead.name)}
+            </div>
+
+            <div class="text-[10px] text-slate-600">
+              ${esc(lead.location||"")}
+            </div>
+
+          </td>
+
+          <td class="text-slate-400 text-xs">
+            ${esc(lead.email||"—")}
+          </td>
+
+          <td>
+
+            <span class="${statusClass} text-xs font-bold">
+              ${esc(lead.status||"New")}
+            </span>
+
+          </td>
+
+          <td>
+
+            ${
+              lead.email
+              ?
+              `<button
+                onclick="pitch(${lead.id})"
+                class="text-sky-300 hover:text-sky-200 text-xs font-bold">
+                PITCH
+              </button>`
+              :
+              `<span class="text-slate-600 text-xs">NO EMAIL</span>`
+            }
+
+          </td>
+
+        </tr>
+
+        `;
+
+      }).join("")
+    :
+      `
+      <tr>
+        <td colspan="4"
+            class="p-10 text-center text-slate-600">
+          No leads yet. Start your first search.
+        </td>
+      </tr>
+      `;
+
+
+  $("chats").innerHTML=messages.length
+    ?
+      messages.slice(0,30).map(msg=>`
+
+        <div class="
+          rounded-2xl
+          bg-white/[.035]
+          border border-white/5
+          p-3
+          ${msg.direction==="out"?"ml-8":""}
+        ">
+
+          <div class="flex justify-between gap-3">
+
+            <div class="text-xs font-bold">
+              ${esc(msg.name||"Lead")}
+            </div>
+
+            <div class="text-[10px] text-slate-600">
+              ${msg.direction==="in"?"INCOMING":"OUTGOING"}
+            </div>
+
+          </div>
+
+          ${
+            msg.subject
+            ?
+            `<div class="text-xs text-slate-500 mt-1">
+              ${esc(msg.subject)}
+            </div>`
+            :""
+          }
+
+          <div class="text-sm text-slate-300 mt-2 whitespace-pre-wrap">
+            ${esc(msg.body||"").slice(0,500)}
+          </div>
+
+        </div>
+
+      `).join("")
+    :
+      `
+      <div class="rounded-2xl bg-white/[.025] p-7 text-center">
+
+        <div class="text-3xl mb-2">
+          💬
+        </div>
+
+        <div class="text-sm text-slate-500">
+          No conversations yet.
+        </div>
+
+      </div>
+      `;
+
+
+  const hot=
+    leads.filter(x=>x.status==="HANDOFF REQUIRED");
+
+
+  $("handoffs").innerHTML=hot.length
+    ?
+      hot.map(lead=>`
+
+        <div class="
+          rounded-2xl
+          border border-red-400/30
+          bg-red-500/[.07]
+          p-4
+          pulse
+        ">
+
+          <div class="text-red-300 text-[10px] font-black tracking-widest">
+            [ HANDOFF REQUIRED ]
+          </div>
+
+          <div class="font-black mt-1">
+            ${esc(lead.name)}
+          </div>
+
+          <div class="text-xs text-slate-500 mt-1">
+            ${esc(lead.email||"")}
+          </div>
+
+
+          <div class="flex gap-2 mt-4">
+
+            <input
+              id="pay-${lead.id}"
+              class="
+                flex-1
+                min-w-0
+                bg-black/20
+                border border-white/10
+                rounded-xl
+                p-2.5
+                text-xs
+                outline-none
+                focus:border-red-400/40
+              "
+              placeholder="Paste payment link"
+            >
+
+            <button
+              onclick="sendPayment(${lead.id})"
+              class="
+                btn
+                bg-red-400
+                text-black
+                font-black
+                px-4
+                rounded-xl
+                text-xs
+              ">
+              SEND
+            </button>
+
+          </div>
+
+        </div>
+
+      `).join("")
+    :
+      `
+      <div class="rounded-2xl bg-white/[.025] p-7 text-center">
+
+        <div class="text-3xl mb-2">
+          ✨
+        </div>
+
+        <div class="text-sm text-slate-500">
+          No hot handoffs right now.
+        </div>
+
+      </div>
+      `;
+
+
+  $("logs").innerHTML=
+    (STATE.logs||[]).slice(0,25).map(log=>`
+
+      <div>
+        <span class="${
+          log.level==="error"
+          ?"text-red-400"
+          :
+          log.level==="warn"
+          ?"text-yellow-400"
+          :
+          "text-slate-500"
+        }">
+          •
+        </span>
+
+        ${esc(log.message)}
+
+      </div>
+
+    `).join("")||"No activity yet.";
+
+
+  updateAutoPitch();
+
+}
+
+
+function updateAutoPitch(){
+
+  const on=!!STATE.autoPitch;
+
+  $("auto").className=
+    "w-14 h-8 rounded-full relative transition "+
+    (on?"bg-sky-500":"bg-slate-700");
+
+  $("autoDot").style.transform=
+    on?"translateX(24px)":"translateX(0)";
+
+  $("aiStatus").classList.toggle("hidden",!on);
+}
+
+
+async function api(url,options={}){
+
+  const response=await fetch(url,options);
+
+  let data={};
+
+  try{
+    data=await response.json();
+  }catch{}
+
+  if(!response.ok){
+    throw new Error(data.error||"Request failed");
+  }
+
+  return data;
+}
+
+
+async function load(){
+
+  try{
+
+    const state=
+      await api("/api/state");
+
+    render(state);
+
+  }catch(error){
+
+    console.error(error);
+
+    toast(error.message,"error");
+
+  }
+
+}
+
+
+async function scrape(){
+
+  const query=$("q").value.trim();
+
+  const location=$("loc").value.trim();
+
+  if(!query||!location){
+
+    toast(
+      "Keyword aur location dono enter karo.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  const button=$("scrapeBtn");
+
+  button.disabled=true;
+
+  button.textContent="SCANNING…";
+
+  $("scrapeMsg").textContent=
+    "Google Maps scanning started…";
+
+
+  try{
+
+    const result=
+      await api("/api/scrape",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          query,
+          location
+        })
+      });
+
+
+    $("scrapeMsg").textContent=
+      `${result.found} found • ${result.saved} new leads`;
+
+    toast("Lead discovery complete 🚀");
+
+    await load();
+
+  }catch(error){
+
+    $("scrapeMsg").textContent=
+      error.message;
+
+    toast(error.message,"error");
+
+  }finally{
+
+    button.disabled=false;
+
+    button.textContent="START SCRAPING";
+
+  }
+
+}
+
+
+async function pitch(id){
+
+  try{
+
+    toast("AI pitch generate ho rahi hai…");
+
+    await api("/api/pitch/"+id,{
+      method:"POST"
+    });
+
+    toast("Pitch sent successfully 📤");
+
+    await load();
+
+  }catch(error){
+
+    toast(error.message,"error");
+
+  }
+
+}
+
+
+async function toggleAuto(){
+
+  try{
+
+    await api(
+      "/api/settings/auto-pitch",
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          enabled:!STATE.autoPitch
+        })
+      }
+    );
+
+    await load();
+
+    toast(
+      STATE.autoPitch
+      ?"Auto-Pitch ON 🤖"
+      :"Auto-Pitch OFF"
+    );
+
+  }catch(error){
+
+    toast(error.message,"error");
+
+  }
+
+}
+
+
+async function sendPayment(id){
+
+  const input=
+    $("pay-"+id);
+
+  const link=
+    input.value.trim();
+
+  if(!link){
+
+    toast(
+      "Payment link paste karo.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  try{
+
+    await api(
+      "/api/send/"+id,
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify({
+          subject:"Payment details",
+          body:`Payment link: ${link}`
+        })
+      }
+    );
+
+
+    await api(
+      "/api/resume/"+id,
+      {
+        method:"POST"
+      }
+    );
+
+
+    toast("Payment link sent 💳");
+
+    await load();
+
+  }catch(error){
+
+    toast(error.message,"error");
+
+  }
+
+}
+
+
+/* INITIAL LOAD */
+
+load();
+
+
+/* LIVE WEBSOCKET */
+
+function connectSocket(){
+
+  const protocol=
+    location.protocol==="https:"
+    ?"wss://"
+    :"ws://";
+
+  const socket=
+    new WebSocket(
+ 
