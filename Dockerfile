@@ -1,6 +1,5 @@
 FROM node:20-bookworm
 
-# Puppeteer اور Chromium کے لیے تمام ضروری لائبریریز کو انسٹال کرنا
 RUN apt-get update && apt-get install -y \
     chromium \
     libnspr4 \
@@ -28,9 +27,10 @@ RUN npm install
 COPY . .
 RUN mkdir -p /app/data
 
-# Puppeteer کو سرور کا اپنا کرومیم استعمال کرنے پر مجبور کرنا
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
 ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
 CMD ["npm", "start"]
