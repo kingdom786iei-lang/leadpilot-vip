@@ -1,6 +1,6 @@
 require("dotenv").config();
 const express=require("express"), http=require("http"), path=require("path"), fs=require("fs");
-const Database=require("better-sqlite3"), Anthropic=require("@anthropic-ai/sdk");
+const Database=require("better-sqlite3");
 const nodemailer=require("nodemailer"), puppeteer=require("puppeteer"), {WebSocketServer}=require("ws");
 const {ImapFlow}=require("imapflow");
 
@@ -75,11 +75,14 @@ app.post("/api/scrape",async(req,res)=>{
 let transporter=null;
 function mailer(){if(!process.env.GMAIL_USER||!process.env.GMAIL_APP_PASSWORD)throw Error("Gmail credentials missing in .env");
  if(!transporter)transporter=nodemailer.createTransport({service:"gmail",auth:{user:process.env.GMAIL_USER,pass:process.env.GMAIL_APP_PASSWORD}});return transporter}
-async function pitch(lead){if(!process.env.ANTHROPIC_API_KEY)throw Error("ANTHROPIC_API_KEY missing");
- const ai=new Anthropic({apiKey:process.env.ANTHROPIC_API_KEY});
- const r=await ai.messages.create({model:process.env.ANTHROPIC_MODEL||"claude-3-5-sonnet-latest",max_tokens:180,
- messages:[{role:"user",content:`Write a natural cold email under 70 words for this business: ${lead.name}. Offer a $300/month service that helps them get more customers. No fake claims. Include a simple CTA. Return subject on first line, then email body.`}]});
- const t=r.content?.[0]?.text||""; const [subject,...body]=t.split("\n"); return {subject:subject.replace(/^subject:\s*/i,"").trim(),body:body.join("\n").trim()};
+async function pitch(lead){if(!process.env.OPENROUTER_API_KEY)throw Error("OPENROUTER_API_KEY missing");
+ const resp=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",
+  headers:{"Content-Type":"application/json","Authorization":`Bearer ${process.env.OPENROUTER_API_KEY}`},
+  body:JSON.stringify({model:process.env.OPENROUTER_MODEL||"z-ai/glm-5.2:free",max_tokens:180,
+  messages:[{role:"user",content:`Write a natural cold email under 70 words for this business: ${lead.name}. Offer a $300/month service that helps them get more customers. No fake claims. Include a simple CTA. Return subject on first line, then email body.`}]})});
+ if(!resp.ok)throw Error(`OpenRouter error: ${resp.status} ${await resp.text()}`);
+ const r=await resp.json();
+ const t=r.choices?.[0]?.message?.content||""; const [subject,...body]=t.split("\n"); return {subject:subject.replace(/^subject:\s*/i,"").trim(),body:body.join("\n").trim()};
 }
 app.post("/api/pitch/:id",async(req,res)=>{
  try{const lead=db.prepare("SELECT * FROM leads WHERE id=?").get(req.params.id);if(!lead?.email)return res.status(400).json({error:"Lead has no email"});
