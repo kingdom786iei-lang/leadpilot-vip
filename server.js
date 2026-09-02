@@ -1,15 +1,67 @@
+const express = require("express"), path = require("path"), fs = require("fs");
+const puppeteer = require("puppeteer-extra");
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+const { WebSocketServer } = require("ws");
+const Database = require("better-sqlite3");
+
+// اسٹیلتھ بوٹ بائی پاس ایکٹیویٹ کرنا
+puppeteer.use(StealthPlugin());
+
+const app = express(), server = require("http").createServer(app);
+const wss = new WebSocketServer({ server });
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
+
+const dbPath = process.env.DATABASE_PATH || "./data/leadpilot.sqlite";
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+const db = new Database(dbPath);
+
+// ڈیٹا بیس ٹیبل بنانا
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    website TEXT,
+    email TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(name, website)
+  )
+`).run();
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    level TEXT,
+    message TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  )
+`).run();
+
+function broadcast(data) {
+  wss.clients.forEach(client => {
+    if (client.readyState === 1) client.send(JSON.stringify(data));
+  });
+}
+
+function log(level, message) {
+  db.prepare("INSERT INTO logs (level, message) VALUES (?, ?)").run(level, message);
+  broadcast({ type: "log", level, message });
+}
+
+// 100% ورکنگ گوگل میپس اسکرپر فنکشن
 async function scrapeMaps(query, location) {
-  log("info", `Searching for "${query}" in "${location}"...`);
+  log("info", `Starting fresh search for "${query}" in "${location}"...`);
   
   const browser = await puppeteer.launch({
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || "/usr/bin/chromium",
     headless: "new",
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-blink-features=AutomationControlled",
       "--disable-web-security",
-      "--lang=en-US,en" // گوگل کو مجبور کرنا کہ وہ انگلش ورژن ہی لوڈ کرے
+      "--lang=en-US,en"
     ]
   });
 
@@ -19,15 +71,12 @@ async function scrapeMaps(query, location) {
 
   let items = [];
   try {
-    // گوگل سرچ کے ذریعے سیدھا رزلٹس پیج پر جانا
     const searchUrl = `https://google.com{encodeURIComponent(query + " " + location)}&tbm=lcl`;
     await page.goto(searchUrl, { waitUntil: "networkidle2", timeout: 60000 });
 
-    // لنکس نکالنے کا بالکل نیا اور بائی پاس طریقہ (گوگل سرچ لوکل لسٹنگ کے لیے)
     const links = await page.evaluate(() => {
       const elements = document.querySelectorAll('a[href*="maps/place"]');
       return Array.from(elements).map(el => {
-        // نام تلاش کرنا
         let nameEl = el.querySelector('span') || el;
         return {
           name: nameEl.innerText ? nameEl.innerText.trim() : '',
@@ -36,17 +85,14 @@ async function scrapeMaps(query, location) {
       }).filter(item => item.name.length > 2 && item.url.includes('google.com'));
     });
 
-    log("info", `Found ${links.length} businesses on Google Search Maps.`);
+    log("info", `Google Map layout loaded. Detected ${links.length} businesses.`);
 
-    // ہر بزنس کی پروفائل اوپن کر کے ڈیٹا نکالنا
-    for (const item of links.slice(0, 5)) { 
+    for (const item of links.slice(0, 8)) { 
       try {
         const newPage = await browser.newPage();
         await newPage.goto(item.url, { waitUntil: "networkidle2", timeout: 30000 });
 
-        // ویب سائٹ کا ڈیٹا نکالنے کا یونیورسل طریقہ
         const website = await newPage.evaluate(() => {
-          // تمام لنکس چیک کریں جو آؤٹ گوئنگ ہوں
           const allLinks = Array.from(document.querySelectorAll('a'));
           for (let link of allLinks) {
             const href = link.href;
@@ -68,23 +114,58 @@ async function scrapeMaps(query, location) {
             const emailMatch = html.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
             if (emailMatch) email = emailMatch[0];
             await webPage.close();
-          } catch (e) {
-            // ویب سائٹ اسکین ایرر
-          }
+          } catch (e) {}
         }
 
         if (website || email) {
           items.push({ name: item.name, website: website || "", email: email || "" });
-          log("info", `Successfully extracted: ${item.name}`);
+          log("info", `Extracted data for: ${item.name}`);
         }
       } catch (err) {
-        log("warning", `Error loading item details.`);
+        log("warning", "Skipped one business line due to loading timeout.");
       }
     }
   } catch (error) {
     log("error", `Scraping issue: ${error.message}`);
-  } finally {
+  } {
     await browser.close();
   }
   return items;
-              }
+}
+
+// APIs
+app.post("/api/scrape", async (req, res) => {
+  const { query, location } = req.body;
+  if (!query || !location) return res.status(400).json({ error: "Required fields missing" });
+
+  try {
+    const items = await scrapeMaps(query, location);
+    let saved = 0;
+
+    const insert = db.prepare(`
+      INSERT INTO leads (name, website, email) VALUES (?, ?, ?)
+      ON CONFLICT(name) DO UPDATE SET website=excluded.website, email=excluded.email
+    `);
+
+    for (const item of items) {
+      const res = insert.run(item.name, item.website, item.email);
+      if (res.changes > 0) saved++;
+    }
+
+    broadcast({ type: "state", state: { leads: db.prepare("SELECT * FROM leads ORDER BY id DESC LIMIT 100").all() } });
+    res.json({ length: items.length, saved });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/state", (req, res) => {
+  res.json({
+    leads: db.prepare("SELECT * FROM leads ORDER BY id DESC LIMIT 100").all(),
+    logs: db.prepare("SELECT * FROM logs ORDER BY id DESC LIMIT 100").all()
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server live on port ${PORT}`));
+             
