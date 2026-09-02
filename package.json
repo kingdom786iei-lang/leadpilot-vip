@@ -2,17 +2,14 @@
   "name": "leadpilot-vip",
   "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "start": "node server.js"
-  },
+  "scripts": {"start":"node server.js"},
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.60.0",
-    "better-sqlite3": "^11.10.0",
-    "dotenv": "^16.6.1",
-    "express": "^5.1.0",
-    "imapflow": "^1.0.181",
-    "nodemailer": "^7.0.5",
-    "puppeteer": "^24.16.0",
-    "ws": "^8.18.3"
+    "better-sqlite3":"^11.10.0",
+    "dotenv":"^16.6.1",
+    "express":"^5.1.0",
+    "imapflow":"^1.0.181",
+    "nodemailer":"^7.0.5",
+    "puppeteer":"^24.16.0",
+    "ws":"^8.18.3"
   }
 }
